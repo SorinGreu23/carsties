@@ -4,6 +4,7 @@ using AuctionService.Entities;
 using AutoMapper;
 using Contracts;
 using MassTransit;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,7 +17,7 @@ public class AuctionsController : ControllerBase
     private readonly AuctionDbContext _context;
     private readonly IMapper _mapper;
     private readonly IPublishEndpoint _publishEndpoint;
-
+    
     public AuctionsController(AuctionDbContext context, IMapper mapper, 
         IPublishEndpoint publishEndpoint)
     {
@@ -50,12 +51,12 @@ public class AuctionsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize]
     public async Task<ActionResult<AuctionDto>> CreateAuction(CreateAuctionDto auctionDto)
     {
         var auction = _mapper.Map<Auction>(auctionDto);
-        //TODO: add current user as seller
-        auction.Seller = "test";
-        
+        if (User.Identity != null) auction.Seller = User.Identity.Name;
+
         _context.Auctions.Add(auction);
         
         var newAuction = _mapper.Map<AuctionDto>(auction);
@@ -69,6 +70,7 @@ public class AuctionsController : ControllerBase
         return CreatedAtAction(nameof(GetAuction), new { auction.Id }, newAuction);
     }
 
+    [Authorize]
     [HttpPut("{id}")]
     public async Task<ActionResult> UpdateAuction(Guid id, UpdateAuctionDto updateAuctionDto)
     {
@@ -77,8 +79,8 @@ public class AuctionsController : ControllerBase
 
         if (auction == null)
             return NotFound();
-        
-        //TODO: check seller is current user
+
+        if (User.Identity is { Name: not null } && auction.Seller != User.Identity.Name) return Forbid();
         
         var updatedItem = new Item
         {
@@ -103,6 +105,7 @@ public class AuctionsController : ControllerBase
         return BadRequest("Could not save changes while updating the auction item");
     }
 
+    [Authorize]
     [HttpDelete("{id}")]
     public async Task<ActionResult> DeleteAuction(Guid id)
     {
@@ -113,8 +116,8 @@ public class AuctionsController : ControllerBase
             return NotFound();
         }
         
-        //TODO: check if username matches seller's name
-
+        if (User.Identity != null && auction.Seller != User.Identity.Name) return Forbid();
+        
         _context.Auctions.Remove(auction);
 
         await _publishEndpoint.Publish<AuctionDeleted>(new
