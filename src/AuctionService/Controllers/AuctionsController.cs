@@ -80,7 +80,7 @@ public class AuctionsController : ControllerBase
         if (auction == null)
             return NotFound();
 
-        if (User.Identity is { Name: not null } && auction.Seller != User.Identity.Name) return Forbid();
+        if (auction.Seller != User.Identity.Name) return Forbid();
         
         var updatedItem = new Item
         {
@@ -116,7 +116,7 @@ public class AuctionsController : ControllerBase
             return NotFound();
         }
         
-        if (User.Identity != null && auction.Seller != User.Identity.Name) return Forbid();
+        if (auction.Seller != User.Identity.Name) return Forbid();
         
         _context.Auctions.Remove(auction);
 
