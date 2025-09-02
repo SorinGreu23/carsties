@@ -1,24 +1,59 @@
-import React from 'react'
-import AuctionCard from './AuctionCard';
+"use client";
+import AuctionCard from "./AuctionCard";
+import { Auction, PagedResult } from "@/types";
+import AppPagination from "../components/AppPagination";
+import { getData } from "../actions/auctionActions";
+import { useEffect, useState } from "react";
+import Filters from "./Filters";
+import { useParamsStore } from "@/hooks/useParamsStore";
+import { useShallow } from "zustand/shallow";
+import queryString from "query-string";
 
-async function getData() {
-    const res = await fetch('http://localhost:6001/search');
+export default function Listings() {
+  const [data, setData] = useState<PagedResult<Auction>>();
+  const params = useParamsStore(
+    useShallow((state) => ({
+      pageNumber: state.pageNumber,
+      pageSize: state.pageSize,
+      searchTerm: state.searchTerm,
+    }))
+  );
+  const setParams = useParamsStore((state) => state.setParams);
+  const url = queryString.stringifyUrl(
+    { url: "", query: params },
+    { skipEmptyString: true }
+  );
 
-    if (!res.ok) {
-        throw new Error("Failed to fetch data");
-    }
+  function setPageNumber(pageNumber: number) {
+    setParams({ pageNumber });
+  }
 
-    return res.json();
-}
+  useEffect(() => {
+    getData(url).then((data) => {
+      setData(data);
+    });
+  }, [url]);
 
-export default async function Listings() {
-    const data = await getData();
+  if (data?.results.length === 0) return <h3>Loading...</h3>;
 
-    return (
-        <div>
-            {data && data.result.map((auction: any) => (
-                <AuctionCard key={auction.id} auction={auction} />
-            ))}
+  return (
+    <>
+      <Filters />
+      <div className="grid grid-cols-4 gap-6">
+        {data &&
+          data.results.map((auction) => (
+            <AuctionCard key={auction.id} auction={auction} />
+          ))}
+      </div>
+      {data && (
+        <div className="flex justify-center mt-4">
+          <AppPagination
+            pageChanged={setPageNumber}
+            currentPage={params.pageNumber}
+            pageCount={data.pageCount}
+          />
         </div>
-    )
+      )}
+    </>
+  );
 }
